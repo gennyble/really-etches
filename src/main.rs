@@ -5,7 +5,7 @@ use std::{
 	time::{Duration, Instant},
 };
 
-use gilrs::{Axis, Gilrs};
+use gilrs::{Axis, Button, Gilrs};
 use image::Image;
 use softbuffer::{Context, Surface};
 use tracing::level_filters::LevelFilter;
@@ -36,18 +36,13 @@ fn main() {
 			y: HEIGHT / 2.0,
 		},
 
-		dial: DialState {
-			left_x: 0.0,
-			left_y: 0.0,
-			right_x: 0.0,
-			right_y: 0.0,
-		},
+		dial: DialState::default(),
 		left_angle: 0.0,
 		right_angle: 0.0,
 		next_check: Instant::now(),
 	};
 
-	el.run_app(&mut etch);
+	el.run_app(&mut etch).unwrap();
 }
 
 fn setup_logging() {
@@ -59,11 +54,8 @@ fn setup_logging() {
 
 #[derive(Copy, Clone, Debug, Default)]
 struct DialState {
-	left_x: f32,
-	left_y: f32,
-
-	right_x: f32,
-	right_y: f32,
+	left: Vec2<f32>,
+	right: Vec2<f32>,
 }
 
 struct SurfacedWindow {
@@ -75,7 +67,7 @@ struct Etch {
 	window: Option<SurfacedWindow>,
 	gilrs: Gilrs,
 	img: Image,
-	stylus: Vec2,
+	stylus: Vec2<f32>,
 
 	dial: DialState,
 	left_angle: f32,
@@ -98,10 +90,20 @@ impl Etch {
 					}
 
 					match axis {
-						Axis::LeftStickX => self.dial.left_x = value * 100.0,
-						Axis::LeftStickY => self.dial.left_y = value * 100.0,
-						Axis::RightStickX => self.dial.right_x = value * 100.0,
-						Axis::RightStickY => self.dial.right_y = value * 100.0,
+						Axis::LeftStickX => self.dial.left.x = value * 100.0,
+						Axis::LeftStickY => self.dial.left.y = value * 100.0,
+						Axis::RightStickX => self.dial.right.x = value * 100.0,
+						Axis::RightStickY => self.dial.right.y = value * 100.0,
+						_ => (),
+					}
+				}
+				gilrs::EventType::ButtonPressed(btn, code) => {
+					tracing::trace!("Button press! {btn:?}");
+
+					match btn {
+						Button::South => {
+							self.img.fill(BACKGROUND_COLOUR.into());
+						}
 						_ => (),
 					}
 				}
@@ -112,13 +114,14 @@ impl Etch {
 }
 
 // Why are my consts HERE of all places
-const DIAL_SENSETIVITY: f32 = 2.0;
+const DIAL_SENSITIVITY: f32 = 10.0;
 const WIDTH: f32 = 640.0;
 const HEIGHT: f32 = 480.0;
 
 // a very sublte gentle, dark-and-dull green
 const BACKGROUND_COLOUR: u32 = 0x00868886;
 const LINE_COLOUR: u32 = 0x00303230;
+const STYLUS_COLOUR: u32 = 0x00a0a0a0;
 
 impl ApplicationHandler for Etch {
 	fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
@@ -147,44 +150,59 @@ impl ApplicationHandler for Etch {
 
 				// We check the state of the joystick at 40fps
 				if self.next_check.elapsed() > Duration::from_millis(25) {
-					let left_angle = xy_to_deg(self.dial.left_x, self.dial.left_y);
-					let left_delta = if !left_angle.is_nan() {
-						let delta = angle_delta(left_angle, self.left_angle);
-						self.left_angle = left_angle;
-						delta
-					} else {
-						0.0
-					};
+					let left_angle = xy_to_deg(self.dial.left.x, self.dial.left.y);
 
-					let right_angle = xy_to_deg(self.dial.right_x, self.dial.right_y);
-					let right_delta = if !right_angle.is_nan() {
-						let delta = angle_delta(right_angle, self.right_angle);
-						self.right_angle = right_angle;
+					let left_is_large = self.dial.left.mag() > 50.0;
+					let left_neither_nan = !left_angle.is_nan() && !self.left_angle.is_nan();
+
+					let left_delta = if left_is_large && left_neither_nan {
+						let delta = angle_delta(left_angle, self.left_angle);
 						delta
 					} else {
 						0.0
 					};
+					self.left_angle = left_angle;
+
+					let right_angle = xy_to_deg(self.dial.right.x, self.dial.right.y);
+
+					let right_is_large = self.dial.right.mag() > 50.0;
+					let right_neither_nan = !right_angle.is_nan() && !self.right_angle.is_nan();
+
+					let right_delta = if right_is_large && right_neither_nan {
+						let delta = angle_delta(right_angle, self.right_angle);
+						delta
+					} else {
+						0.0
+					};
+					self.right_angle = right_angle;
 
 					tracing::info!(
-						"ANGLE {left_angle} // {left_delta}v -=- {right_angle} // {right_delta}v"
+						"ANGLE ({}) {left_angle} // {left_delta}v -=- ({}) {right_angle} // {right_delta}v",
+						self.dial.left.mag(), self.dial.right.mag()
 					);
 
 					let stylus_prev = self.stylus;
-					let movement_x = left_delta / 10.0;
-					let movement_y = right_delta / 10.0;
+					let movement_x = left_delta / DIAL_SENSITIVITY;
+					let movement_y = right_delta / DIAL_SENSITIVITY;
 					self.stylus.x =
 						(self.stylus.x + movement_x).clamp(0.0, self.img.width() as f32);
 					self.stylus.y =
 						(self.stylus.y - movement_y).clamp(0.0, self.img.height() as f32);
 
 					self.img.line(
-						self.stylus.x as u32,
-						self.stylus.y as u32,
-						stylus_prev.x as u32,
-						stylus_prev.y as u32,
+						self.stylus.as_u32(),
+						stylus_prev.as_u32(),
 						2,
 						LINE_COLOUR.into(),
 					);
+
+					// Letting the line-draw take care of overdrawing the stylus
+					// worked well except going up for some reason, so we
+					// explicitly overdraw here.
+					self.img.rect(stylus_prev.as_u32(), Vec2::new(2, 2), LINE_COLOUR.into());
+
+					// And then draw the stylus
+					self.img.rect(self.stylus.as_u32(), Vec2::new(2, 2), STYLUS_COLOUR.into());
 
 					tracing::info!("STYLUS: ({},{})", self.stylus.x, self.stylus.y);
 
@@ -252,10 +270,17 @@ fn xy_to_deg(x: f32, y: f32) -> f32 {
 /// and the left-hand side. Intelligently handles the zero-crossing.
 /// lhs should be the newer value, rhs the older.
 fn angle_delta(lhs: f32, rhs: f32) -> f32 {
-	if rhs >= 270.0 && lhs < 90.0 {
+	// If we move too fast, or flick the stick just right, these values can be
+	// bypassed. Perhaps we can check on either side of 180, but this is working
+	// for now. It used to be 270 and 90 for high/low, respectively, but it was
+	// getting a touch jumpy.
+	const HIGH: f32 = 225.0;
+	const LOW: f32 = 135.0;
+
+	if rhs >= HIGH && lhs < LOW {
 		// It is likely we crossed zero in the clockwise direction
 		(lhs + 360.0) - rhs
-	} else if rhs < 90.0 && lhs > 270.0 {
+	} else if rhs < LOW && lhs > HIGH {
 		// It is likely we crossed zero in the anti-clockwise direction
 		lhs - (rhs + 360.0)
 	} else {
@@ -263,8 +288,27 @@ fn angle_delta(lhs: f32, rhs: f32) -> f32 {
 	}
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct Vec2 {
-	x: f32,
-	y: f32,
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Vec2<T> {
+	pub x: T,
+	pub y: T,
+}
+
+impl<T> Vec2<T> {
+	pub fn new(x: T, y: T) -> Self {
+		Self { x, y }
+	}
+}
+
+impl Vec2<f32> {
+	pub fn as_u32(&self) -> Vec2<u32> {
+		Vec2 {
+			x: self.x as u32,
+			y: self.y as u32,
+		}
+	}
+
+	pub fn mag(&self) -> f32 {
+		(self.x * self.x + self.y * self.y).sqrt()
+	}
 }
