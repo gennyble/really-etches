@@ -126,6 +126,7 @@ const STYLUS_COLOUR: u32 = 0x00a0a0a0;
 impl ApplicationHandler for Etch {
 	fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
 		let window = Rc::new(event_loop.create_window(Window::default_attributes()).unwrap());
+		window.set_title("that really etches my sketch");
 		window.set_resizable(false);
 		window.request_inner_size(LogicalSize::new(WIDTH, HEIGHT));
 

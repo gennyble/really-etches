@@ -8,3 +8,10 @@ Keyboard Input
 	between the presses, your acceleration per se, would determine how
 	fast the line is being drawn. a-f is to the right and f-a is to the
 	left. j-; is up, ;-j is down.
+
+Images save as GIF and PNG
+	gif can have a palette of 4 and so can the png. The png might be able
+	to have a depth of 2-bits per pixel which is exciting.
+
+	images should be saved in the underlying resolution and not be dpi
+	scaled. images should not include the stylus.
