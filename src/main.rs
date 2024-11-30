@@ -1,10 +1,16 @@
-use std::time::{Duration, Instant};
+use std::{
+	num::NonZeroU32,
+	rc::Rc,
+	time::{Duration, Instant},
+};
 
 use gilrs::{Axis, GamepadId, Gilrs};
+use softbuffer::{Buffer, Context, Surface};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 use winit::{
 	application::ApplicationHandler,
+	dpi::LogicalSize,
 	event::{DeviceEvent, WindowEvent},
 	event_loop::{ControlFlow, EventLoop},
 	window::Window,
@@ -25,6 +31,7 @@ fn main() {
 		left_angle: 0.0,
 		next_check: Instant::now(),
 	};
+
 	el.run_app(&mut etch);
 }
 
@@ -44,9 +51,13 @@ struct DialState {
 	right_y: f32,
 }
 
-#[derive(Debug)]
+struct SurfacedWindow {
+	window: Rc<Window>,
+	surface: Surface<Rc<Window>, Rc<Window>>,
+}
+
 struct Etch {
-	window: Option<Window>,
+	window: Option<SurfacedWindow>,
 	gilrs: Gilrs,
 
 	dial: DialState,
@@ -55,10 +66,18 @@ struct Etch {
 }
 
 const DIAL_SENSETIVITY: f32 = 2.0;
+const WIDTH: f32 = 640.0;
+const HEIGHT: f32 = 480.0;
 
 impl ApplicationHandler for Etch {
 	fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-		self.window = Some(event_loop.create_window(Window::default_attributes()).unwrap());
+		let window = Rc::new(event_loop.create_window(Window::default_attributes()).unwrap());
+		window.set_resizable(false);
+		window.request_inner_size(LogicalSize::new(WIDTH, HEIGHT));
+
+		let ctx = Context::new(window.clone()).unwrap();
+		let surface = Surface::new(&ctx, window.clone()).unwrap();
+		self.window = Some(SurfacedWindow { window, surface });
 	}
 
 	fn window_event(
@@ -75,6 +94,7 @@ impl ApplicationHandler for Etch {
 			WindowEvent::RedrawRequested => {
 				let previous_dial = self.dial;
 
+				// Process gamepad events
 				while let Some(gilrs::Event {
 					id, event, time, ..
 				}) = self.gilrs.next_event()
@@ -95,6 +115,7 @@ impl ApplicationHandler for Etch {
 					}
 				}
 
+				// We check the state of the joystick at 20fps
 				if self.next_check.elapsed() > Duration::from_millis(50) {
 					let left_angle = xy_to_deg(self.dial.left_x, self.dial.left_y);
 
@@ -105,7 +126,36 @@ impl ApplicationHandler for Etch {
 					self.next_check = Instant::now();
 				}
 
-				self.window.as_ref().map(|w| w.request_redraw());
+				let Some(surfaced) = self.window.as_mut() else {
+					tracing::warn!("self.window is None in Redraw!");
+					return;
+				};
+
+				let (width, height) = {
+					let phys = surfaced.window.inner_size();
+					(phys.width as usize, phys.height as usize)
+				};
+
+				let mut buffer = surfaced.surface.buffer_mut().unwrap();
+				for idx in 0..width {
+					buffer[idx + (height / 2) * width] = 0xFF00FF00;
+				}
+
+				buffer.present().unwrap();
+				//surfaced.window.request_redraw();
+			}
+			WindowEvent::Resized(phys) => {
+				tracing::trace!("resized window: {phys:?}");
+
+				if let Some(surfaced) = self.window.as_mut() {
+					surfaced
+						.surface
+						.resize(
+							NonZeroU32::new(phys.width).unwrap(),
+							NonZeroU32::new(phys.height).unwrap(),
+						)
+						.unwrap();
+				}
 			}
 			_ => (),
 		}
