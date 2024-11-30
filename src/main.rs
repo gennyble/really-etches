@@ -1,20 +1,24 @@
 use std::{
 	num::NonZeroU32,
+	ops::DerefMut,
 	rc::Rc,
 	time::{Duration, Instant},
 };
 
-use gilrs::{Axis, GamepadId, Gilrs};
-use softbuffer::{Buffer, Context, Surface};
+use gilrs::{Axis, Gilrs};
+use image::Image;
+use softbuffer::{Context, Surface};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 use winit::{
 	application::ApplicationHandler,
 	dpi::LogicalSize,
-	event::{DeviceEvent, WindowEvent},
+	event::WindowEvent,
 	event_loop::{ControlFlow, EventLoop},
 	window::Window,
 };
+
+mod image;
 
 fn main() {
 	setup_logging();
@@ -26,9 +30,20 @@ fn main() {
 	let mut etch = Etch {
 		window: None,
 		gilrs: Gilrs::new().unwrap(),
+		img: Image::new(WIDTH as u32, HEIGHT as u32, Some(BACKGROUND_COLOUR.into())),
+		stylus: Vec2 {
+			x: 10.0,
+			y: HEIGHT / 2.0,
+		},
 
-		dial: DialState::default(),
+		dial: DialState {
+			left_x: 0.0,
+			left_y: 0.0,
+			right_x: 0.0,
+			right_y: 0.0,
+		},
 		left_angle: 0.0,
+		right_angle: 0.0,
 		next_check: Instant::now(),
 	};
 
@@ -59,15 +74,51 @@ struct SurfacedWindow {
 struct Etch {
 	window: Option<SurfacedWindow>,
 	gilrs: Gilrs,
+	img: Image,
+	stylus: Vec2,
 
 	dial: DialState,
 	left_angle: f32,
+	right_angle: f32,
 	next_check: Instant,
 }
 
+impl Etch {
+	pub fn process_gamepad_events(&mut self) {
+		while let Some(gilrs::Event {
+			id, event, time, ..
+		}) = self.gilrs.next_event()
+		{
+			match event {
+				gilrs::EventType::AxisChanged(axis, value, _code) => {
+					tracing::trace!("{axis:?} value={value}");
+
+					if value.is_nan() {
+						continue;
+					}
+
+					match axis {
+						Axis::LeftStickX => self.dial.left_x = value * 100.0,
+						Axis::LeftStickY => self.dial.left_y = value * 100.0,
+						Axis::RightStickX => self.dial.right_x = value * 100.0,
+						Axis::RightStickY => self.dial.right_y = value * 100.0,
+						_ => (),
+					}
+				}
+				_ => (),
+			}
+		}
+	}
+}
+
+// Why are my consts HERE of all places
 const DIAL_SENSETIVITY: f32 = 2.0;
 const WIDTH: f32 = 640.0;
 const HEIGHT: f32 = 480.0;
+
+// a very sublte gentle, dark-and-dull green
+const BACKGROUND_COLOUR: u32 = 0x00868886;
+const LINE_COLOUR: u32 = 0x00303230;
 
 impl ApplicationHandler for Etch {
 	fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
@@ -92,37 +143,45 @@ impl ApplicationHandler for Etch {
 				event_loop.exit();
 			}
 			WindowEvent::RedrawRequested => {
-				let previous_dial = self.dial;
+				self.process_gamepad_events();
 
-				// Process gamepad events
-				while let Some(gilrs::Event {
-					id, event, time, ..
-				}) = self.gilrs.next_event()
-				{
-					match event {
-						gilrs::EventType::AxisChanged(axis, value, _code) => {
-							tracing::trace!("{axis:?} value={value}");
-
-							match axis {
-								Axis::LeftStickX => self.dial.left_x = value * 100.0,
-								Axis::LeftStickY => self.dial.left_y = value * 100.0,
-								Axis::RightStickX => self.dial.right_x = value * 100.0,
-								Axis::RightStickY => self.dial.right_y = value * 100.0,
-								_ => (),
-							}
-						}
-						_ => (),
-					}
-				}
-
-				// We check the state of the joystick at 20fps
-				if self.next_check.elapsed() > Duration::from_millis(50) {
+				// We check the state of the joystick at 40fps
+				if self.next_check.elapsed() > Duration::from_millis(25) {
 					let left_angle = xy_to_deg(self.dial.left_x, self.dial.left_y);
+					let left_delta = if !left_angle.is_nan() {
+						let delta = angle_delta(left_angle, self.left_angle);
+						self.left_angle = left_angle;
+						delta
+					} else {
+						0.0
+					};
 
-					let left_delta = angle_delta(left_angle, self.left_angle);
-					self.left_angle = left_angle;
+					let right_angle = xy_to_deg(self.dial.right_x, self.dial.right_y);
+					let right_delta = if !right_angle.is_nan() {
+						let delta = angle_delta(right_angle, self.right_angle);
+						self.right_angle = right_angle;
+						delta
+					} else {
+						0.0
+					};
 
-					tracing::info!("ANGLE {left_angle} // {left_delta}v");
+					tracing::info!(
+						"ANGLE {left_angle} // {left_delta}v -=- {right_angle} // {right_delta}v"
+					);
+
+					let movement_x = left_delta / 10.0;
+					let movement_y = right_delta / 10.0;
+					self.stylus.x =
+						(self.stylus.x + movement_x).clamp(0.0, self.img.width() as f32);
+					self.stylus.y =
+						(self.stylus.y - movement_y).clamp(0.0, self.img.height() as f32);
+
+					let w = self.img.width();
+					self.img.data_mut()
+						[w as usize * self.stylus.y as usize + self.stylus.x as usize] = LINE_COLOUR;
+
+					tracing::info!("STYLUS: ({},{})", self.stylus.x, self.stylus.y);
+
 					self.next_check = Instant::now();
 				}
 
@@ -131,18 +190,25 @@ impl ApplicationHandler for Etch {
 					return;
 				};
 
-				let (width, height) = {
+				let (window_width, window_height) = {
 					let phys = surfaced.window.inner_size();
 					(phys.width as usize, phys.height as usize)
 				};
 
 				let mut buffer = surfaced.surface.buffer_mut().unwrap();
-				for idx in 0..width {
-					buffer[idx + (height / 2) * width] = 0xFF00FF00;
-				}
+				neam::nearest_buffer(
+					self.img.data(),
+					1,
+					self.img.width(),
+					self.img.height(),
+					buffer.deref_mut(),
+					window_width as u32,
+					window_height as u32,
+				);
 
+				surfaced.window.pre_present_notify();
 				buffer.present().unwrap();
-				//surfaced.window.request_redraw();
+				surfaced.window.request_redraw();
 			}
 			WindowEvent::Resized(phys) => {
 				tracing::trace!("resized window: {phys:?}");
@@ -189,4 +255,9 @@ fn angle_delta(lhs: f32, rhs: f32) -> f32 {
 	} else {
 		lhs - rhs
 	}
+}
+
+pub struct Vec2 {
+	x: f32,
+	y: f32,
 }
