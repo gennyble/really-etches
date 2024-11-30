@@ -169,6 +169,7 @@ impl ApplicationHandler for Etch {
 						"ANGLE {left_angle} // {left_delta}v -=- {right_angle} // {right_delta}v"
 					);
 
+					let stylus_prev = self.stylus;
 					let movement_x = left_delta / 10.0;
 					let movement_y = right_delta / 10.0;
 					self.stylus.x =
@@ -176,9 +177,14 @@ impl ApplicationHandler for Etch {
 					self.stylus.y =
 						(self.stylus.y - movement_y).clamp(0.0, self.img.height() as f32);
 
-					let w = self.img.width();
-					self.img.data_mut()
-						[w as usize * self.stylus.y as usize + self.stylus.x as usize] = LINE_COLOUR;
+					self.img.line(
+						self.stylus.x as u32,
+						self.stylus.y as u32,
+						stylus_prev.x as u32,
+						stylus_prev.y as u32,
+						2,
+						LINE_COLOUR.into(),
+					);
 
 					tracing::info!("STYLUS: ({},{})", self.stylus.x, self.stylus.y);
 
@@ -257,6 +263,7 @@ fn angle_delta(lhs: f32, rhs: f32) -> f32 {
 	}
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Vec2 {
 	x: f32,
 	y: f32,
