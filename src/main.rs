@@ -117,6 +117,16 @@ impl Etch {
 	pub fn clear_pressed(&mut self) {
 		self.img.fill(BACKGROUND_COLOUR.into());
 	}
+
+	pub fn save(&self) {
+		let location = rfd::FileDialog::new()
+			.add_filter("gif", &["gif"])
+			.add_filter("png", &["png"])
+			.set_file_name("etch.gif")
+			.save_file();
+
+		if let Some(path) = location {}
+	}
 }
 
 // Why are my consts HERE of all places
@@ -180,6 +190,8 @@ impl ApplicationHandler for Etch {
 					Key::Character(";") => self.gallop_y.push(3),
 
 					Key::Named(NamedKey::Backspace) => self.clear_pressed(),
+
+					Key::Character("p") => self.save(),
 					_ => (),
 				}
 			}
