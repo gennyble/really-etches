@@ -335,7 +335,7 @@ impl ApplicationHandler for Etch {
 					self.next_check = Instant::now();
 				}
 
-				if self.next_gallop_check.elapsed() > Duration::from_millis(100) {
+				if self.next_gallop_check.elapsed() > Duration::from_millis(25) {
 					while let Some(ge) = self.gallop_x.event() {
 						match ge {
 							GallopEvent::Positive(gdur) => {
