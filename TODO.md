@@ -34,3 +34,25 @@ Clearing should be gradual
 
 	It would be cute if the screen did a side-to-side animation on each
 	press as well.
+
+==== DONE? ====
+
+Reduce memory usage with profiling
+	resources:
+	- A blog post from the rust-analyzer team on memory profiling (Dec. 2020)
+	  https://rust-analyzer.github.io/blog/2020/12/04/measuring-memory-usage-in-rust.html
+	- Polar Signals blog post on using some jemalloc instrumentation (Oct. 2023)
+	  https://www.polarsignals.com/blog/posts/2023/12/20/rust-memory-profiling
+	- Quickwit post on using heaptrack. This one first!! (Mar. 2022)
+	  https://quickwit.io/blog/memory-inspector-gadget
+
+	currently, on macOS, it seems we use 18MB while running. This seems reasonable
+	for a GUI application but it also seems high? All we really have is a window
+	with a place to put pixels. If my math isn't terribly wrong, which it might be,
+	we have
+
+	DONE
+	because i wrote the smallest winit program, none-surface-left-beef, that's only
+	job was to make a winit window. It used 11MB. Our surfaces, assuming that
+	softbuffer holds only one buffer in memory, was ~5.2MB (~5MB for the 640x480 window
+	at a 2x scale, and ~1.2MB for 640x480 (both using u32s for pixels)).
