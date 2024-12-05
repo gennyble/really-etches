@@ -6,6 +6,7 @@ use std::{
 	time::{Duration, Instant},
 };
 
+use gallop::{Gallop, GallopEvent, GALLOP_TOLERANCE};
 use gilrs::{Axis, Button, Gilrs};
 use image::Image;
 use softbuffer::{Context, Surface};
@@ -20,6 +21,7 @@ use winit::{
 	window::Window,
 };
 
+mod gallop;
 mod image;
 
 fn main() {
@@ -58,106 +60,6 @@ fn setup_logging() {
 	tracing_subscriber::fmt().with_env_filter(env_filter).init();
 }
 
-#[derive(Clone, Debug, Default)]
-struct Gallop {
-	keys: [Option<Instant>; 4],
-}
-
-impl Gallop {
-	pub fn push(&mut self, idx: usize) {
-		if idx >= self.keys.len() {
-			panic!("gallop index out of bound");
-		}
-
-		self.keys[idx] = Some(Instant::now());
-	}
-
-	pub fn event(&mut self) -> Option<GallopEvent> {
-		let mut sorted: Vec<(usize, Option<Instant>)> = self.keys.into_iter().enumerate().collect();
-		sorted.sort_by(|(_, a_inst), (_, b_inst)| {
-			if a_inst.is_none() {
-				Ordering::Greater
-			} else if b_inst.is_none() {
-				Ordering::Less
-			} else {
-				a_inst.cmp(&b_inst)
-			}
-		});
-
-		let (early2_idx, Some(early2)) = sorted[0] else {
-			return None;
-		};
-
-		let (early_idx, Some(early)) = sorted[1] else {
-			return None;
-		};
-
-		tracing::info!(
-			"early = [{}] {}us // early2 = [{}] {}us",
-			early_idx,
-			early.elapsed().as_micros(),
-			early2_idx,
-			early2.elapsed().as_micros()
-		);
-
-		let high = self.keys.len() - 1;
-		if early_idx == 0 && early2_idx == high {
-			tracing::trace!("gallop (+) wrap special case");
-			self.keys[early2_idx] = None;
-			return Some(GallopEvent::Positive(early.duration_since(early2)));
-		} else if early_idx == high && early2_idx == 0 {
-			tracing::trace!("gallop (-) wrap special case");
-		}
-
-		if early_idx > early2_idx {
-			let delta = early_idx - early2_idx;
-			self.keys[early2_idx] = None;
-
-			if delta > 1 {
-				tracing::info!("gallop (+) delta>1");
-				None
-			} else {
-				Some(GallopEvent::Positive(early.duration_since(early2)))
-			}
-		} else if early_idx < early2_idx {
-			let delta = early2_idx - early_idx;
-			self.keys[early2_idx] = None;
-
-			if delta > 1 {
-				tracing::info!("gallop (-) delta>1");
-				None
-			} else {
-				Some(GallopEvent::Negative(early.duration_since(early2)))
-			}
-		} else {
-			None
-		}
-	}
-}
-
-#[derive(Clone, Debug)]
-enum GallopEvent {
-	Positive(Duration),
-	Negative(Duration),
-}
-
-impl GallopEvent {
-	pub fn value(&self) -> f32 {
-		match self {
-			Self::Positive(gdur) => {
-				let delta = GALLOP_TOLERANCE - *gdur;
-				let units = delta.as_millis() as f32 / GALLOP_SENSETIVITY.as_millis() as f32;
-				units
-			}
-			Self::Negative(gdur) => {
-				let delta = GALLOP_TOLERANCE - *gdur;
-				let units = delta.as_millis() as f32 / GALLOP_SENSETIVITY.as_millis() as f32;
-				-units
-			}
-		}
-	}
-}
-
 #[derive(Copy, Clone, Debug, Default)]
 struct DialState {
 	left: Vec2<f32>,
@@ -192,13 +94,7 @@ impl Etch {
 		}) = self.gilrs.next_event()
 		{
 			match event {
-				gilrs::EventType::AxisChanged(axis, value, _code) => {
-					tracing::trace!("{axis:?} value={value}");
-
-					if value.is_nan() {
-						continue;
-					}
-
+				gilrs::EventType::AxisChanged(axis, value, _code) if !value.is_nan() => {
 					match axis {
 						Axis::LeftStickX => self.dial.left.x = value * 100.0,
 						Axis::LeftStickY => self.dial.left.y = value * 100.0,
@@ -207,26 +103,24 @@ impl Etch {
 						_ => (),
 					}
 				}
-				gilrs::EventType::ButtonPressed(btn, code) => {
-					tracing::trace!("Button press! {btn:?}");
-
-					match btn {
-						Button::South => {
-							self.img.fill(BACKGROUND_COLOUR.into());
-						}
-						_ => (),
-					}
-				}
+				gilrs::EventType::ButtonPressed(btn, code) => match btn {
+					Button::South => self.clear_pressed(),
+					_ => (),
+				},
 				_ => (),
 			}
 		}
 	}
 }
 
+impl Etch {
+	pub fn clear_pressed(&mut self) {
+		self.img.fill(BACKGROUND_COLOUR.into());
+	}
+}
+
 // Why are my consts HERE of all places
 const DIAL_SENSITIVITY: f32 = 10.0;
-const GALLOP_SENSETIVITY: Duration = Duration::from_millis(25);
-const GALLOP_TOLERANCE: Duration = Duration::from_millis(250);
 const WIDTH: f32 = 640.0;
 const HEIGHT: f32 = 480.0;
 
@@ -284,6 +178,8 @@ impl ApplicationHandler for Etch {
 					Key::Character("k") => self.gallop_y.push(1),
 					Key::Character("l") => self.gallop_y.push(2),
 					Key::Character(";") => self.gallop_y.push(3),
+
+					Key::Named(NamedKey::Backspace) => self.clear_pressed(),
 					_ => (),
 				}
 			}
