@@ -116,6 +116,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
+name = "bitvec"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bc2832c24239b0141d5674bb9174f9d68a8b5b3f2753311927c172ca46f7e9c"
+dependencies = [
+ "funty",
+ "radium",
+ "tap",
+ "wyz",
+]
+
+[[package]]
 name = "block2"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -417,6 +429,7 @@ dependencies = [
 name = "etch"
 version = "0.1.0"
 dependencies = [
+ "gifed 0.3.0",
  "gilrs",
  "neam",
  "softbuffer",
@@ -484,6 +497,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
+name = "funty"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
+
+[[package]]
 name = "gethostname"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -509,6 +528,15 @@ name = "gifed"
 version = "0.1.0"
 source = "git+https://github.com/gennyble/gifed?rev=0dd0a6c2d910437d040b14994c80468f3bd6fbc7#0dd0a6c2d910437d040b14994c80468f3bd6fbc7"
 dependencies = [
+ "weezl",
+]
+
+[[package]]
+name = "gifed"
+version = "0.3.0"
+source = "git+https://git.nyble.dev/multimedia/gifed#7a3a4b5f86b17015e174737fde6c4867682b17f8"
+dependencies = [
+ "bitvec",
  "weezl",
 ]
 
@@ -777,7 +805,7 @@ name = "neam"
 version = "0.1.0"
 source = "git+https://github.com/gennyble/neam?rev=5efc1761866283537fd254a8fb3582f50631cf0f#5efc1761866283537fd254a8fb3582f50631cf0f"
 dependencies = [
- "gifed",
+ "gifed 0.1.0",
  "png",
 ]
 
@@ -1160,6 +1188,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "radium"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
+
+[[package]]
 name = "raw-window-handle"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1406,6 +1440,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "tap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "thiserror"
@@ -2172,6 +2212,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36c1fec1a2bb5866f07c25f68c26e565c4c200aebb96d7e55710c19d3e8ac49b"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "wyz"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
+dependencies = [
+ "tap",
 ]
 
 [[package]]
