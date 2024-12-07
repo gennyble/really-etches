@@ -105,6 +105,7 @@ impl Etch {
 				}
 				gilrs::EventType::ButtonPressed(btn, code) => match btn {
 					Button::South => self.clear_pressed(),
+					Button::North => self.save(),
 					_ => (),
 				},
 				_ => (),
