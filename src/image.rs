@@ -1,3 +1,5 @@
+use gifed::{block::Palette, videogif::Frame, writer::ImageBuilder, Gif};
+
 use crate::Vec2;
 
 #[allow(dead_code)]
@@ -28,6 +30,34 @@ impl Image {
 
 	pub fn data_mut(&mut self) -> &mut [u32] {
 		&mut self.data
+	}
+
+	pub fn gif(&self) -> Gif {
+		let mut palette = self.data.clone();
+		palette.sort();
+		palette.dedup();
+
+		let indicies: Vec<u8> = self
+			.data
+			.clone()
+			.into_iter()
+			.map(|pix| palette.iter().position(|&x| x == pix).unwrap() as u8)
+			.collect();
+
+		let palette: Vec<gifed::Color> = palette
+			.into_iter()
+			.map(|c| {
+				let b = c.to_be_bytes();
+				gifed::Color::from([b[3], b[2], b[1]])
+			})
+			.collect();
+
+		let img = ImageBuilder::new(self.width as u16, self.height as u16).build(indicies).unwrap();
+		let mut gif = Gif::new(self.width as u16, self.height as u16);
+		gif.set_palette(Some(Palette::try_from(palette).unwrap()));
+		gif.push(img);
+
+		gif
 	}
 
 	pub fn width(&self) -> u32 {

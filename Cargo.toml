@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-gifed = { git = "https://git.nyble.dev/multimedia/gifed" }
+gifed = { git = "https://git.nyble.dev/multimedia/gifed", features = [
+	"videoish",
+] }
 gilrs = "0.11.0"
 neam = { git = "https://github.com/gennyble/neam", rev = "5efc1761866283537fd254a8fb3582f50631cf0f" }
 rfd = "0.15.1"

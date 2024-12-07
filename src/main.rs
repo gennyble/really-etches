@@ -15,7 +15,7 @@ use tracing_subscriber::EnvFilter;
 use winit::{
 	application::ApplicationHandler,
 	dpi::LogicalSize,
-	event::{DeviceEvent, KeyEvent, WindowEvent},
+	event::{KeyEvent, WindowEvent},
 	event_loop::{ControlFlow, EventLoop},
 	keyboard::{Key, NamedKey},
 	window::Window,
@@ -125,7 +125,11 @@ impl Etch {
 			.set_file_name("etch.gif")
 			.save_file();
 
-		if let Some(path) = location {}
+		if let Some(path) = location {
+			tracing::info!("saving gif to {}", path.to_string_lossy());
+			let gif = self.img.gif();
+			gif.save(path).unwrap();
+		}
 	}
 }
 
