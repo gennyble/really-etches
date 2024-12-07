@@ -88,12 +88,21 @@ impl Image {
 	/// draws a rect of the specified width at that location.
 	pub fn line(&mut self, p1: Vec2<u32>, p2: Vec2<u32>, width: u32, clr: Color) {
 		let start_x = p1.x.min(p2.x) as f32;
-		let start_y = p1.y.min(p2.y) as f32;
+		let mut start_y = p1.y.min(p2.y) as f32;
 		let end_x = p1.x.max(p2.x) as f32;
-		let end_y = p1.y.max(p2.y) as f32;
+		let mut end_y = p1.y.max(p2.y) as f32;
 
-		tracing::trace!("start_x = {start_x} / end_x = {end_x}");
-		tracing::trace!("start_y = {start_y} / end_y = {end_y}");
+		if start_y < end_y && start_x < end_x {
+			// this just swaps the problem.
+			//FIXME: genny- 2024-12
+			let temp_y = start_y;
+			start_y = end_y;
+			end_y = temp_y;
+		}
+
+		tracing::trace!("LINE");
+		tracing::trace!("\tstart_x = {start_x} / end_x = {end_x}");
+		tracing::trace!("\tstart_y = {start_y} / end_y = {end_y}");
 
 		let dx = end_x - start_x;
 		let dy = end_y - start_y;

@@ -1,4 +1,4 @@
-Keyboard Input
+(1) Keyboard Input
 	Nov 30th:
 	the main input method right now is spinning the two thumbsticks on
 	some kind of game controller, but you can't spin a keyboard key.
@@ -19,14 +19,29 @@ Keyboard Input
 	be: `VerticalGallop jkl;`. reversing those characters could allow you
 	to invert the direction of the gallop, but that should also be an option.
 
-Images save as GIF and PNG
+	Dec 7th:
+	this is pretty clunky. perhaps the tuning cannot fix it. we should try
+	and see if just advancing the cursor on keypress feels alright. the
+	direction thing would need work, though. "on keypress" to mean the
+	entire press not while down. I want a press to be an action alone and
+	not some kind of "smooth draw". although i guess that's what the
+	etch-a-sketch would be like? lots to think about.
+
+(2) Mouse Input
+	this would be cute. Two mice required :)
+
+	one scroll wheel for each degree of freedom. we can have a little
+	sub-window where you can click to identify the mice, "vertical" and
+	"horizontal", and then perhaps a setting to switch them.
+
+(3) Images save as GIF and PNG
 	gif can have a palette of 4 and so can the png. The png might be able
 	to have a depth of 2-bits per pixel which is exciting.
 
 	images should be saved in the underlying resolution and not be dpi
 	scaled. images should not include the stylus.
 
-Clearing should be gradual
+(4) Clearing should be gradual
 	It should require multiple button presses, to imitate shaking a thing,
 	and with each shake the existing lines should get some fixed amount
 	closer to the background colour. maybe they gain 10% of the difference
@@ -35,9 +50,26 @@ Clearing should be gradual
 	It would be cute if the screen did a side-to-side animation on each
 	press as well.
 
+(5) Crash when you try to go below the bottom
+	If you're moving down and you hit the bottom edge, we crash.
+
+(6) Lines with a positive slope draw wrong
+	When you're diagonaling right and up, the line draws almost-inverted
+	and comes out as right and down, but it's more than that. Seemingly,
+	the start and end of the slop-line draw with swapped Y coordinates.
+
+	image.rs:98
+	this just swaps the problem. i think what we need to do is figure
+	out when it gets mad, possibly all the time when the starting Y is
+	lower in the image (so higher Y value) than the ending position.
+	And then we should special-case that. Or attempt to use a "real"
+	line drawing algorithm. Draw larger-than-a-pixel-squares at every
+	point is certainly an algorithm, but probably not the most efficient
+	one we can use. Modified brashman's for thick lines?
+
 ==== DONE? ====
 
-Reduce memory usage with profiling
+(7) Reduce memory usage with profiling
 	resources:
 	- A blog post from the rust-analyzer team on memory profiling (Dec. 2020)
 	  https://rust-analyzer.github.io/blog/2020/12/04/measuring-memory-usage-in-rust.html
