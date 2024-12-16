@@ -73,11 +73,18 @@ impl Image {
 	}
 
 	pub fn rect(&mut self, pos: Vec2<u32>, dim: Vec2<u32>, clr: Color) {
+		if pos.x >= self.width || pos.y >= self.height {
+			// if we're fully over in one of these directions, we shouldn't go further.
+			return;
+		}
+
+		// .min(..) so we only draw what we can see/what's within bounds
 		let x_start = pos.x as usize;
-		let x_end = (pos.x + dim.x) as usize;
+		let x_end = (pos.x + dim.x).min(self.width - 1) as usize;
+		let y_end = (pos.y + dim.y).min(self.height - 1) as usize;
 
 		for idx in x_start..x_end {
-			for idy in pos.y as usize..pos.y as usize + dim.y as usize {
+			for idy in pos.y as usize..y_end {
 				let data_idx = idx + idy * self.width as usize;
 				self.data[data_idx] = clr.into();
 			}

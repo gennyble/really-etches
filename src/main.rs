@@ -132,6 +132,20 @@ impl Etch {
 			gif.save(path).unwrap();
 		}
 	}
+
+	pub fn keep_stylus_inbounds(&mut self) {
+		if self.stylus.x < 0.0 {
+			self.stylus.x = 0.0;
+		} else if self.stylus.x > self.img.width() as f32 - 1.0 {
+			self.stylus.x = self.img.width() as f32 - 1.0;
+		}
+
+		if self.stylus.y < 0.0 {
+			self.stylus.y = 0.0
+		} else if self.stylus.y > self.img.height() as f32 - 1.0 {
+			self.stylus.y = self.img.height() as f32 - 1.0;
+		}
+	}
 }
 
 // Why are my consts HERE of all places
@@ -240,10 +254,8 @@ impl ApplicationHandler for Etch {
 
 					let movement_x = left_delta / DIAL_SENSITIVITY;
 					let movement_y = right_delta / DIAL_SENSITIVITY;
-					self.stylus.x =
-						(self.stylus.x + movement_x).clamp(0.0, self.img.width() as f32);
-					self.stylus.y =
-						(self.stylus.y - movement_y).clamp(0.0, self.img.height() as f32);
+					self.stylus.x = self.stylus.x + movement_x;
+					self.stylus.y = self.stylus.y - movement_y;
 
 					self.next_check = Instant::now();
 				}
@@ -279,6 +291,8 @@ impl ApplicationHandler for Etch {
 						}
 					}
 				}
+
+				self.keep_stylus_inbounds();
 
 				// If the stylus moved, we should draw
 				if stylus_prev != self.stylus {

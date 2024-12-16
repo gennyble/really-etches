@@ -50,9 +50,6 @@
 	It would be cute if the screen did a side-to-side animation on each
 	press as well.
 
-(5) Crash when you try to go below the bottom
-	If you're moving down and you hit the bottom edge, we crash.
-
 (6) Lines with a positive slope draw wrong
 	When you're diagonaling right and up, the line draws almost-inverted
 	and comes out as right and down, but it's more than that. Seemingly,
@@ -88,3 +85,17 @@
 	job was to make a winit window. It used 11MB. Our surfaces, assuming that
 	softbuffer holds only one buffer in memory, was ~5.2MB (~5MB for the 640x480 window
 	at a 2x scale, and ~1.2MB for 640x480 (both using u32s for pixels)).
+
+(5) Crash when you try to go below the bottom
+	If you're moving down and you hit the bottom edge, we crash.
+
+	DONE
+	this was because in image.rs Image::rect() we do not check that we
+	are only drawing within bounds, and our lines (secretly many rects)
+	were 2 wide. so when we draw the stylus, which is also two-wide, it
+	would try to draw below the image and crash.
+	this also happened on the horizontal but it was wrap back around to
+	the left edge. humorously the in-bounds check used to only be done
+	when we handled the joystick events, which was not every frame. so
+	the keyboard could make it significantly past the right-edge and do
+	a little drawing past that on the left.
